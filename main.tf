@@ -6,7 +6,6 @@ terraform {
   backend "s3" {
     bucket = "shivbucket10"
     key    = "shiv.tfstate"
-    region = "us-east-1"
   }
 }
 
