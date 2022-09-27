@@ -22,4 +22,5 @@ steps:
   inputs:
     provider: 'aws'
     command: 'destroy'
+    workingDirectory: '$(System.DefaultWorkingDirectory)/main.tf'
     environmentServiceNameAWS: 'shiv-aws1'
