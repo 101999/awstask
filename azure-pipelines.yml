@@ -23,3 +23,8 @@ steps:
     provider: 'aws'
     command: 'apply'
     environmentServiceNameAWS: 'shiv-aws1'
+- task: TerraformTaskV3@3
+  inputs:
+    provider: 'aws'
+    command: 'destroy'
+    environmentServiceNameAWS: 'shiv-aws1'
