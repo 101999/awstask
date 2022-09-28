@@ -2,14 +2,6 @@ provider "aws" {
    region     = "us-east-1"     
 }
 
-terraform {
-  backend "s3" {
-    bucket = "shivbucket10"
-    key    = "shiv.tfstate"
-  }
-}
-
-
 resource "aws_vpc" "Shivani-vpc1" {
   cidr_block           = var.cidr_block
   enable_dns_support   = true
@@ -84,6 +76,10 @@ resource "aws_vpc" "Shivani-vpc1" {
     Name = "shiv-nat"
   }
  }
+
+ data "aws_iam_role" "iam-shiv" {
+  name = "AWSServiceRoleForECS"
+}
 
  resource "aws_route_table" "shiv1-rt1" {    
     vpc_id =  aws_vpc.Shivani-vpc1.id
@@ -198,15 +194,9 @@ resource "aws_ecs_task_definition" "Shiv_Taskdef" {
   cpu = "1024"
   memory =  "2048"
   network_mode =  "awsvpc"
+  execution_role_arn  = data.aws_iam_role.iam-shiv.arn
 
    container_definitions = file("./ServiceforFargate.json")
-runtime_platform {
- operating_system_family = "WINDOWS_SERVER_2019_FULL"
- cpu_architecture = "X86_64"
-}
-depends_on = [
-  aws_ecs_cluster.shiv_cluster
-]
 
   #jsonencode([
     #{
