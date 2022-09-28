@@ -1,7 +1,7 @@
 [
     {
       "name"   : "shivcontainerfargate",
-      "image"  :  "mcr.microsoft.com/windows/servercore/iis",
+      "image"  :  "254011110770.dkr.ecr.us-east-1.amazonaws.com/shiv10:latest",
       "cpu"   :   10,
       "memory" :  512,
       "networkMode" : "awsvpc",
