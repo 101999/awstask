@@ -78,7 +78,7 @@ resource "aws_vpc" "Shivani-vpc1" {
  }
 
  data "aws_iam_role" "iam-shiv" {
-  name = "AWSServiceRoleForECS"
+  name = "codedeployforECS-BG"
 }
 
  resource "aws_route_table" "shiv1-rt1" {    
@@ -147,24 +147,42 @@ tags = {
 output "ip" {
   value = aws_lb.shiv-lb.dns_name
 }
-resource "aws_lb_listener" "shiv-lb_listener" {  
+resource "aws_lb_listener" "shiv_lb_listener_1" {  
+  load_balancer_arn =  aws_lb.shiv-lb.arn
+  port              =  "80"  
+  protocol          = "HTTP"
+
+  default_action { 
+  type = "forward"
+  target_group_arn = aws_lb_target_group.shiv_target_group_1.arn
+  }
+  }
+resource "aws_lb_listener" "shiv_lb_listener_2" {  
   load_balancer_arn =  aws_lb.shiv-lb.arn
   port              =  "8080"  
   protocol          = "HTTP"
 
   default_action { 
   type = "forward"
-  target_group_arn = aws_lb_target_group.shiv_target_group.arn
+  target_group_arn = aws_lb_target_group.shiv_target_group_2.arn
   }
   }
   
-resource "aws_lb_target_group" "shiv_target_group"{
-  name = "shiv-target-group"
+resource "aws_lb_target_group" "shiv_target_group_1"{
+  name = "shiv-target-group-1"
   port     = 80
   protocol = "HTTP"
   target_type = "ip"
   vpc_id   = aws_vpc.Shivani-vpc1.id  
  }
+resource "aws_lb_target_group" "shiv_target_group_2"{
+  name = "shiv-target-group-2"
+  port     = 80
+  protocol = "HTTP"
+  target_type = "ip"
+  vpc_id   = aws_vpc.Shivani-vpc1.id  
+ }
+
 
  /* resource "aws_lb_target_group_attachment" "shiv_tg_attachment" {
   target_group_arn = aws_lb_target_group.shiv_target_group.arn
@@ -179,6 +197,32 @@ resource "aws_ecr_repository" "ecr" {
   image_scanning_configuration {
     scan_on_push = true
  }
+}
+resource "aws_ecr_repository_policy" "demo-repo-policy" {
+  repository = "shiv10"
+  policy  =<<EOF
+  {
+    "Version": "2008-10-17",
+    "Statement": [
+     {
+        "Sid": "adds full ecr access to the demo repository",
+        "Effect": "Allow",
+        "Principal": "*",
+        "Action": [
+          "ecr:*",
+          "ecr:BatchCheckLayerAvailability",
+          "ecr:BatchGetImage",
+          "ecr:CompleteLayerUpload",
+          "ecr:GetDownloadUrlForLayer",
+          "ecr:GetLifecyclePolicy",
+          "ecr:InitiateLayerUpload",
+          "ecr:PutImage",
+          "ecr:UploadLayerPart"
+    ]
+   }
+  ]
+ }
+ EOF
 }
 
 resource "aws_ecs_cluster" "shiv_cluster" {
@@ -225,8 +269,8 @@ tags = {
   ingress {
     description      = "TLS from VPC"
     protocol         = "tcp"
-    from_port        = 8080
-    to_port          = 8080
+    from_port        = 80
+    to_port          = 80
     cidr_blocks      = [var.sec_cidr_block]
     security_groups  = [aws_security_group.shiv-sec.id]
   }
@@ -254,10 +298,54 @@ resource "aws_ecs_service" "shiv-ecs-service" {
   }
 
 load_balancer{
-  target_group_arn = aws_lb_target_group.shiv_target_group.arn
+  target_group_arn = aws_lb_target_group.shiv_target_group_1.arn
   container_name = "shivcontainerfargate"
   container_port = 80
 }
+}
+resource "aws_codedeploy_app" "codedeploy_shiv" {
+  compute_platform = "ECS"
+  name             = "codedeploy-ss"
+  }
+
+  resource "aws_codedeploy_deployment_group" "codedeployment_shiv" {
+  app_name               = "aws_codedeploy_app.codedeploy_shiv.name"
+  deployment_group_name  = "codedeployment-shiv"
+  deployment_config_name = "CodeDeployDefault.ECSAllAtOnce"
+  service_role_arn       = data.aws_iam_role.iam-shiv.arn
+  blue_green_deployment_config {
+    deployment_ready_option {
+      action_on_timeout = "CONTINUE_DEPLOYMENT"
+    }
+  terminate_blue_instances_on_deployment_success {
+    action = "TERMINATE"
+    termination_wait_time_in_minutes = 5
+    }
+  }
+  deployment_style {
+    deployment_option = "WITH_TRAFFIC_CONTROL"
+    deployment_type   = "BLUE_GREEN"
+  }
+  ecs_service {
+    cluster_name = aws_ecs_cluster.shiv_cluster.name
+    service_name = aws_ecs_service.shiv-ecs-service.name
+  }
+  load_balancer_info {
+    target_group_pair_info {
+      prod_traffic_route {
+        listener_arns = [aws_lb_listener.shiv_lb_listener_1.arn]
+      }
+      target_group {
+        name = "aws_lb_target_group.shiv_target_group_1.name"
+      }
+      target_group {
+        name = "aws_lb_target_group.shiv_target_group_2.name"
+      }
+      test_traffic_route {
+        listener_arns = [aws_lb_listener.shiv_lb_listener_2.arn]
+      }
+    }
+  }
 }
 
 resource "aws_route53_zone" "shivani" {
@@ -274,3 +362,4 @@ resource "aws_route53_record" "www" {
  evaluate_target_health = true
 }
 }
+
